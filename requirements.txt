@@ -1,0 +1,10 @@
+streamlit>=1.20.0
+pdfplumber>=0.7.5
+docx2txt>=0.8
+keybert>=0.7.0
+sentence-transformers>=2.2.2
+torch>=1.13.0
+transformers>=4.30.0
+language-tool-python>=2.8.0
+numpy>=1.23.0
+scikit-learn
