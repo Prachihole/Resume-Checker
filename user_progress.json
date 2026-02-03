@@ -17,6 +17,49 @@
   "xyz@gmail.com": {
     "resumes_built": 1,
     "ats_score_avg": 34.5,
-    "grammar_fixes": 35
+    "grammar_fixes": 47
+  },
+  "xyz": {
+    "name": "xyz@gmail.com",
+    "resumes_analyzed": 0,
+    "avg_ats": 0,
+    "grammar_fixes": 0
+  },
+  "xyz1@gmail.com": {
+    "resumes_built": 0,
+    "ats_score_avg": 0,
+    "grammar_fixes": 10,
+    "resumes_analyzed": 5,
+    "avg_ats_score": 68.2,
+    "ats_history": [
+      {
+        "timestamp": "2026-01-28 23:49",
+        "ats_score": 75,
+        "verdict": "Good ATS confidence \u00b7 Moderate recruiter clarity",
+        "jd_keywords": [
+          "monitoring",
+          "artificial",
+          "machine",
+          "intelligence",
+          "and"
+        ],
+        "matched_keywords": [
+          "monitoring",
+          "artificial",
+          "machine",
+          "intelligence",
+          "and"
+        ],
+        "high_impact_bullets": 0
+      },
+      {
+        "timestamp": "2026-01-28 23:48",
+        "ats_score": 65,
+        "verdict": "Good ATS confidence \u00b7 Moderate recruiter clarity",
+        "jd_keywords": [],
+        "matched_keywords": [],
+        "high_impact_bullets": 0
+      }
+    ]
   }
 }

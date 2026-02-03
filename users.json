@@ -25,5 +25,9 @@
   "xyz@gmail.com": {
     "name": "sen",
     "password": "$2b$12$ZZvI.MU3HjS4Rzh0Fonoae.MJmZ.wrpS0lCDf0v1pBZJNNqrIgF7a"
+  },
+  "xyz1@gmail.com": {
+    "name": "sen",
+    "password": "xyz"
   }
 }

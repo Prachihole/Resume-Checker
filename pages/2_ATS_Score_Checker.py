@@ -1,229 +1,413 @@
-# pages/2_ATS_Score_Checker.py
-
 import streamlit as st
-import re, time
-from collections import Counter
-import plotly.graph_objects as go
-from docx import Document
-import language_tool_python
+import json
+import os
 
-# =========================
-# 🔐 LOGIN PROTECTION
-# =========================
-if "logged_in" not in st.session_state or not st.session_state.logged_in:
-    st.warning("⚠️ Please login first")
+USER_PROGRESS_FILE = "user_progress.json"
+
+def load_progress():
+    if not os.path.exists(USER_PROGRESS_FILE):
+        with open(USER_PROGRESS_FILE, "w") as f:
+            json.dump({}, f)
+    with open(USER_PROGRESS_FILE, "r") as f:
+        return json.load(f)
+
+def save_progress(data):
+    with open(USER_PROGRESS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+def normalize_profile(profile):
+    defaults = {
+        "resumes_analyzed": 0,
+        "avg_ats_score": 0,
+        "grammar_fixes": 0,
+        "ats_history": []
+    }
+    for k, v in defaults.items():
+        profile.setdefault(k, v)
+    return profile
+
+
+if not st.session_state.get("logged_in", False):
+    st.warning("Please log in to access this page.")
     st.stop()
 
-# =========================
-# 🎨 HEADER
-# =========================
-st.title("📊 ATS Resume Score Checker")
-st.caption("Resume-centric | Explains exactly WHY your score changes")
+import streamlit as st
+import docx2txt
+import re
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
-st.markdown("""
-<style>
-.kpi {
-    background:#ffffff;
-    padding:18px;
-    border-radius:14px;
-    text-align:center;
-    box-shadow:0 4px 14px rgba(0,0,0,0.08);
-}
-.kpi h1 {margin:0;color:#0b7a75;}
-.kpi p {margin:0;color:#555;font-size:0.9rem;}
-</style>
-""", unsafe_allow_html=True)
+# ==========================================================
+# PAGE CONFIG
+# ==========================================================
+st.set_page_config(
+    page_title="ATS Resume Checker",
+    page_icon="📊",
+    layout="wide"
+)
 
-# =========================
-# 🧠 CONSTANTS
-# =========================
-LANG_TOOL = language_tool_python.LanguageTool('en-US')
+st.markdown("## 📊 ATS Resume Checker")
+st.caption(
+    "Professional ATS readiness & recruiter impact analysis · "
+    "Clear guidance · Confidence-first UX"
+)
 
+# ==========================================================
+# LOAD MODEL
+# ==========================================================
+@st.cache_resource
+def load_model():
+    return SentenceTransformer("all-MiniLM-L6-v2")
+
+model = load_model()
+
+# ==========================================================
+# CONSTANTS
+# ==========================================================
 ACTION_VERBS = [
-    "developed","designed","implemented","led","managed",
-    "built","optimized","analyzed","created","improved"
+    "built","developed","designed","implemented","created",
+    "optimized","improved","trained","deployed","analyzed"
 ]
 
-SECTIONS = ["experience","education","skills","projects","certifications"]
+LEADERSHIP_VERBS = [
+    "led","owned","managed","coordinated","mentored"
+]
 
-# =========================
-# 📄 TEXT EXTRACTION
-# =========================
+RESULT_PATTERNS = [
+    r"\d+%", r"\d+x", r"\d+\+?",
+    "accuracy","reduced","improved","increased"
+]
+
+TECH_HINTS = [
+    "opencv","mediapipe","tensorflow","pytorch",
+    "machine learning","deep learning",
+    "computer vision","ai","model","pipeline"
+]
+
+IGNORE_LINES = [
+    "@","http","linkedin","github","email","phone",
+    "skills","education","objective","summary"
+]
+
+# ==========================================================
+# HELPERS
+# ==========================================================
 def extract_text(file):
     if file.name.endswith(".docx"):
-        doc = Document(file)
-        return "\n".join(p.text for p in doc.paragraphs if p.text)
-    return file.getvalue().decode("utf-8", errors="ignore")
+        return docx2txt.process(file)
+    return file.read().decode("utf-8", errors="ignore")
 
-# =========================
-# 🔍 JD KEYWORDS
-# =========================
-def extract_jd_keywords(jd_text, top_n=35):
-    words = re.findall(r'\b[a-zA-Z][a-zA-Z+\-# ]{2,}\b', jd_text.lower())
-    freq = Counter(words)
-    return [w for w, _ in freq.most_common(top_n)]
+def clean_lines(text):
+    return [l.strip() for l in text.split("\n") if len(l.strip()) > 10]
 
-# =========================
-# 🧮 ATS ENGINE
-# =========================
-def ats_engine(resume_text, jd_keywords):
-    resume = resume_text.lower()
+def extract_keywords(text):
+    return set(re.findall(r"[a-zA-Z][a-zA-Z+.#]+", text.lower()))
 
-    matched = [k for k in jd_keywords if k in resume]
-    missing = [k for k in jd_keywords if k not in resume]
+def semantic_similarity(a, b):
+    if not b.strip():
+        return 0.55  # neutral baseline when JD is vague
+    emb = model.encode([a, b])
+    return cosine_similarity([emb[0]], [emb[1]])[0][0]
 
-    keyword_score = int((len(matched)/len(jd_keywords))*30) if jd_keywords else 0
+def extract_experience_bullets(lines):
+    bullets = []
+    for l in lines:
+        low = l.lower()
+        if any(i in low for i in IGNORE_LINES):
+            continue
+        if any(v in low for v in ACTION_VERBS):
+            bullets.append(l)
+    return bullets
 
-    verb_count = sum(1 for v in ACTION_VERBS if v in resume)
-    verb_score = min(12, verb_count * 2)
+# ==========================================================
+# BULLET IMPACT SCORING (FAIR, RECRUITER-ALIGNED)
+# ==========================================================
+def impact_score(bullet, jd_keywords):
+    t = bullet.lower()
+    score = 0
 
-    metrics = re.findall(r'\b\d+%|\b\d+\s+years?', resume)
-    metric_score = min(8, len(metrics) * 2)
+    has_action = any(v in t for v in ACTION_VERBS)
+    has_metric = any(re.search(p, t) for p in RESULT_PATTERNS)
+    has_leadership = any(v in t for v in LEADERSHIP_VERBS)
+    has_tech = any(k in t for k in jd_keywords) or any(h in t for h in TECH_HINTS)
 
-    section_count = sum(1 for s in SECTIONS if s in resume)
-    structure_score = int((section_count / len(SECTIONS)) * 20)
+    if has_action:
+        score += 25
+    if has_tech:
+        score += 25
+    if has_metric:
+        score += 25
+    if has_leadership:
+        score += 15
 
-    grammar_issues = LANG_TOOL.check(resume_text)
-    grammar_score = max(0, 15 - (len(grammar_issues)//3))
+    # Floors (important for UX fairness)
+    if has_action and has_tech:
+        score = max(score, 50)
+    if has_action and has_tech and has_metric:
+        score = max(score, 75)
 
-    formatting_score = 15 if "-" in resume or "•" in resume else 9
+    return min(score, 100)
 
-    final = min(
-        100,
-        keyword_score + verb_score + metric_score +
-        structure_score + grammar_score + formatting_score
+# ==========================================================
+# INPUTS
+# ==========================================================
+resume_file = st.file_uploader(
+    "📤 Upload Resume (DOCX / TXT)",
+    type=["docx","txt"]
+)
+
+jd_text = st.text_area(
+    "🧾 Paste Job Description (optional but recommended)",
+    height=120
+)
+
+if not resume_file:
+    st.info("Upload your resume to begin analysis.")
+    st.stop()
+
+# ==========================================================
+# PROCESS RESUME
+# ==========================================================
+resume_text = extract_text(resume_file)
+lines = clean_lines(resume_text)
+bullets = extract_experience_bullets(lines)
+
+jd_keywords = extract_keywords(jd_text)
+resume_keywords = extract_keywords(resume_text)
+
+semantic_match = semantic_similarity(resume_text, jd_text)
+matched_keywords = [k for k in jd_keywords if k in resume_keywords]
+
+high_impact_bullets = sum(
+    1 for b in bullets if impact_score(b, jd_keywords) >= 75
+)
+
+# ==========================================================
+# ATS SCORE (CALIBRATED, CONFIDENCE-SAFE)
+# ==========================================================
+skill_score = min(semantic_match * 40, 40)
+keyword_score = (len(matched_keywords) / max(len(jd_keywords), 1)) * 25
+experience_score = 20 if high_impact_bullets >= 1 else 12
+formatting_score = 15
+
+overall_ats = round(
+    skill_score + keyword_score + experience_score + formatting_score
+)
+
+# Confidence floor (VERY IMPORTANT)
+if experience_score >= 12 and formatting_score == 15 and overall_ats < 65:
+    overall_ats = 65
+
+# ======================================================
+# 📊 UPDATE DASHBOARD METRICS (SOURCE OF TRUTH)
+# ======================================================
+user_email = st.session_state.user_email
+
+data = load_progress()
+
+if user_email not in data:
+    data[user_email] = normalize_profile({})
+
+profile = normalize_profile(data[user_email])
+
+# Update resume count
+previous_count = profile["resumes_analyzed"]
+previous_avg = profile["avg_ats_score"]
+
+new_count = previous_count + 1
+
+# Running average formula
+new_avg = round(
+    ((previous_avg * previous_count) + overall_ats) / new_count,
+    1
+)
+
+profile["resumes_analyzed"] = new_count
+profile["avg_ats_score"] = new_avg
+
+data[user_email] = profile
+save_progress(data)
+
+
+# ==========================================================
+# BADGES (PRIMARY UX)
+# ==========================================================
+badges = []
+
+if overall_ats >= 70:
+    badges.append("🏷️ ATS-Ready")
+
+if high_impact_bullets >= 1:
+    badges.append("🏷️ Recruiter-Ready")
+
+if overall_ats >= 65 and high_impact_bullets == 0:
+    badges.append("🏷️ Impact Can Be Strengthened")
+
+
+from datetime import datetime
+
+# ======================================================
+# 🕒 SAVE ATS ANALYSIS HISTORY
+# ======================================================
+# Ensure verdict is defined before creating the analysis entry
+if overall_ats >= 80:
+    verdict = "🟢 High confidence for ATS & recruiter review"
+elif overall_ats >= 65:
+    verdict = "🟡 Good ATS confidence · Moderate recruiter clarity"
+else:
+    verdict = "🟠 Needs clarity for ATS screening"
+jd_keywords_list = list(jd_keywords)
+matched_keywords_list = list(matched_keywords)
+
+analysis_entry = {
+    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    "ats_score": overall_ats,
+    "verdict": verdict.replace("🟢","").replace("🟡","").replace("🟠","").replace("🔴","").strip(),
+    "jd_keywords": jd_keywords_list[:5],
+"matched_keywords": matched_keywords_list[:5],
+
+    "high_impact_bullets": high_impact_bullets
+}
+
+profile["ats_history"].insert(0, analysis_entry)
+
+# Keep last 10 analyses only (UX choice)
+profile["ats_history"] = profile["ats_history"][:10]
+
+data[user_email] = profile
+save_progress(data)
+
+
+
+
+
+# ==========================================================
+# CONFIDENCE METER
+# ==========================================================
+if overall_ats >= 80:
+    confidence_level = "🟢 High confidence for ATS & recruiter review"
+elif overall_ats >= 65:
+    confidence_level = "🟡 Good ATS confidence · Moderate recruiter clarity"
+else:
+    confidence_level = "🟠 Needs clarity for ATS screening"
+
+# ==========================================================
+# DISPLAY — SCORE & BADGES
+# ==========================================================
+st.divider()
+c1, c2 = st.columns([1,2])
+
+with c1:
+    st.metric("ATS Readiness Score", f"{overall_ats} / 100")
+    st.caption(
+        "This score reflects how clearly your resume communicates "
+        "its value to ATS systems and recruiters."
     )
 
-    return {
-        "final": final,
-        "matched": matched,
-        "missing": missing,
-        "metrics": metrics,
-        "grammar": grammar_issues[:10],
-        "scores": {
-            "Keywords": keyword_score,
-            "Action Verbs": verb_score,
-            "Metrics": metric_score,
-            "Structure": structure_score,
-            "Grammar": grammar_score,
-            "Formatting": formatting_score
-        }
-    }
+with c2:
+    st.markdown("### Readiness Badges")
+    for b in badges:
+        st.markdown(f"- {b}")
 
-# =========================
-# 🧾 INPUT
-# =========================
-col1, col2 = st.columns([2,1])
+    st.markdown("### 📈 Resume Confidence Level")
+    st.info(confidence_level)
 
-with col1:
-    resume_file = st.file_uploader("📤 Upload Resume (DOCX / TXT)", type=["docx","txt"])
+# ==========================================================
+# RECRUITER IMPRESSION (HUMAN VIEW)
+# ==========================================================
+st.divider()
+st.subheader("🧑‍💼 Recruiter Impression")
 
-with col2:
-    jd_text = st.text_area("🧾 Paste Job Description", height=220)
-
-analyze = st.button("🚀 Analyze Resume")
-
-# =========================
-# 🚀 OUTPUT
-# =========================
-if analyze and resume_file and jd_text:
-    with st.spinner("Analyzing resume with ATS rules..."):
-        resume_text = extract_text(resume_file)
-        jd_keywords = extract_jd_keywords(jd_text)
-        result = ats_engine(resume_text, jd_keywords)
-        time.sleep(0.3)
-
-    # =========================
-    # 📌 KPI CARDS
-    # =========================
-    k1,k2,k3,k4 = st.columns(4)
-    k1.markdown(f"<div class='kpi'><h1>{result['final']}%</h1><p>ATS Score</p></div>", unsafe_allow_html=True)
-    k2.markdown(f"<div class='kpi'><h1>{len(result['matched'])}</h1><p>Matched JD Keywords</p></div>", unsafe_allow_html=True)
-    k3.markdown(f"<div class='kpi'><h1>{len(result['missing'])}</h1><p>Missing Keywords</p></div>", unsafe_allow_html=True)
-    k4.markdown(f"<div class='kpi'><h1>{len(result['metrics'])}</h1><p>Metrics Found</p></div>", unsafe_allow_html=True)
-
-    st.divider()
-
-    # =========================
-    # 🎯 ATS PROBABILITY
-    # =========================
-    if result["final"] >= 85:
-        st.success("🟢 High ATS shortlisting probability (≈85–90%)")
-    elif result["final"] >= 70:
-        st.warning("🟡 Moderate probability (≈55–70%)")
-    else:
-        st.error("🔴 Low probability (<40%)")
-
-    # =========================
-    # 🎯 GAUGE
-    # =========================
-    st.plotly_chart(
-        go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=result["final"],
-            title={"text":"ATS Compatibility"},
-            gauge={"axis":{"range":[0,100]}}
-        )),
-        use_container_width=True
+if high_impact_bullets >= 1:
+    st.success(
+        "Strong technical profile. Your resume demonstrates real "
+        "AI-driven project impact and is likely to engage recruiters."
+    )
+else:
+    st.info(
+        "Technically solid resume. Recruiters will understand your skills, "
+        "but clearer impact statements can improve engagement."
     )
 
-    # =========================
-    # 📉 SCORE LOSS BREAKDOWN (KEY FIX)
-    # =========================
-    st.markdown("## 📉 Why your ATS score dropped")
+# ==========================================================
+# CONDITIONAL UX MESSAGING (CRITICAL)
+# ==========================================================
+st.divider()
 
-    loss = {
-        "Keywords": 30 - result["scores"]["Keywords"],
-        "Action Verbs": 12 - result["scores"]["Action Verbs"],
-        "Metrics": 8 - result["scores"]["Metrics"],
-        "Structure": 20 - result["scores"]["Structure"],
-        "Grammar": 15 - result["scores"]["Grammar"],
-        "Formatting": 15 - result["scores"]["Formatting"]
-    }
+if overall_ats >= 80 and high_impact_bullets >= 1:
+    st.subheader("✅ What’s Working Well")
+    st.markdown(
+        """
+        Your resume clearly communicates:
+        • Real AI / technical project experience  
+        • Practical, real-world relevance  
+        • Measurable or validated outcomes  
 
-    loss_sorted = sorted(loss.items(), key=lambda x: x[1], reverse=True)
+        Only optional refinements are shown below.
+        """
+    )
 
-    for sec, pts in loss_sorted:
-        if pts > 0:
-            st.write(f"❌ **{sec}** reduced your score by **{pts} points**")
+elif overall_ats >= 65:
+    st.subheader("🚀 One Opportunity to Strengthen Impact")
+    st.markdown(
+        """
+        Your resume contains strong technical work.
+        A **small change** in how one project is presented
+        can significantly improve recruiter clarity.
 
-    # =========================
-    # 🔍 KEYWORD ANALYSIS (TEXT ONLY)
-    # =========================
-    matched_pct = int((len(result["matched"]) / len(jd_keywords))*100) if jd_keywords else 0
-
-    st.markdown("## 🔍 Keyword Match Analysis")
-    st.write(f"You matched **{len(result['matched'])}/{len(jd_keywords)} JD keywords** (**{matched_pct}% match rate**).")
-
-    if result["missing"]:
-        st.write("### 🔴 Highest-impact missing keywords:")
-        for kw in result["missing"][:6]:
-            st.write(f"- {kw}")
-
-    # =========================
-    # ✍️ GRAMMAR IMPACT
-    # =========================
-    grammar_loss = 15 - result["scores"]["Grammar"]
-    st.markdown("## ✍️ Grammar Impact")
-    st.write(f"Grammar issues reduced your ATS score by **{grammar_loss} points**.")
-
-    # =========================
-    # 🚀 PRIORITY FIXES
-    # =========================
-    st.markdown("## 🚀 Top 3 Actions to Increase Score Fast")
-
-    priority = []
-    if loss["Keywords"] > 6:
-        priority.append("Add missing JD keywords naturally into Skills & Experience")
-    if loss["Metrics"] > 4:
-        priority.append("Add measurable results (%, years, scale, impact)")
-    if loss["Grammar"] > 4:
-        priority.append("Fix grammar issues")
-    if loss["Structure"] > 4:
-        priority.append("Ensure clear sections: Experience, Skills, Education")
-
-    for i, p in enumerate(priority[:3], 1):
-        st.write(f"**{i}.** {p}")
+        **Best next step:**  
+        → Combine related bullets and highlight one clear result.
+        """
+    )
 
 else:
-    st.info("Upload resume and JD, then click **Analyze Resume**")
+    st.subheader("⚠️ Needs Attention")
+    st.markdown(
+        """
+        Your resume has relevant content, but impact is not yet clear
+        to ATS systems. Improving experience descriptions will
+        greatly increase visibility.
+        """
+    )
+
+# ==========================================================
+# PROJECT-LEVEL INSIGHT
+# ==========================================================
+st.divider()
+st.subheader("🧠 Project-Level Insight")
+
+if bullets:
+    st.write(
+        "One or more strong technical projects detected. "
+        "Impact is best communicated when related details are "
+        "combined into 1–2 complete, results-driven bullets."
+    )
+else:
+    st.warning("No clear experience or project bullets detected.")
+
+# ==========================================================
+# OPTIONAL BULLET DETAILS (SUPPORTING ONLY)
+# ==========================================================
+with st.expander("🔍 Supporting Project Details (Optional)"):
+    st.caption(
+        "These bullets support your main project impact and "
+        "do not negatively affect ATS screening."
+    )
+
+    for i, b in enumerate(bullets[:6], 1):
+        s = impact_score(b, jd_keywords)
+        badge = "🟢" if s >= 75 else "🟡" if s >= 60 else "⚪"
+
+        st.markdown(f"**Detail {i} — Impact Strength: {s} / 100 {badge}**")
+        st.markdown(f"> {b}")
+
+# ==========================================================
+# FOOTER
+# ==========================================================
+st.divider()
+st.caption(
+    "Professional, resume-based ATS analysis · "
+    "Recruiter-aligned · Confidence-first UX · No fake penalties"
+)
+
+

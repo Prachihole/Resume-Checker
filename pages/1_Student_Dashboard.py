@@ -2,16 +2,15 @@ import streamlit as st
 import json
 import os
 
-# ===========================================
-# 🔐 LOGIN CHECK
-# ===========================================
+# ======================================================
+# 🔐 LOGIN PROTECTION (MANDATORY)
+# ======================================================
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
-    st.warning("⚠️ Please log in first.")
-    st.stop()
+    st.switch_page("app.py")
 
-# ===========================================
-# 📦 USER DATA STORAGE (LOCAL JSON)
-# ===========================================
+# ======================================================
+# 📦 USER PROGRESS STORAGE (DB READY)
+# ======================================================
 USER_PROGRESS_FILE = "user_progress.json"
 
 def load_progress():
@@ -25,121 +24,172 @@ def save_progress(data):
     with open(USER_PROGRESS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-user_email = st.session_state.get("user_email", "")
+user_email = st.session_state.user_email
+user_name = st.session_state.user_name
+
 data = load_progress()
+st.info(
+    "👋 New here? Start by building your resume or upload an existing one "
+    "to see ATS and recruiter insights."
+)
+
+# Default profile
 if user_email not in data:
-    data[user_email] = {"resumes_built": 0, "ats_score_avg": 0, "grammar_fixes": 0}
+    data[user_email] = {
+        "resumes_analyzed": 0,
+        "avg_ats_score": 0,
+        "grammar_fixes": 0,
+        "ats_history": []
+    }
     save_progress(data)
 
-progress = data[user_email]
 
-# ===========================================
-# 🎨 PAGE CONFIG
-# ===========================================
-st.set_page_config(page_title="Student Dashboard", page_icon="🎓", layout="wide")
+# -------------------------------
+# Normalize user profile (schema-safe)
+# -------------------------------
+profile = data.get(user_email, {})
+
+profile.setdefault("resumes_analyzed", 0)
+profile.setdefault("avg_ats_score", 0)
+profile.setdefault("grammar_fixes", 0)
+
+# Save back if new keys were added
+data[user_email] = profile
+save_progress(data)
+
+
+# ======================================================
+# 🎨 DASHBOARD STYLES (CLEAN SaaS)
+# ======================================================
+st.set_page_config(layout="wide")
 
 st.markdown("""
 <style>
 body {
-  background: linear-gradient(135deg, #0a0f1e, #122635, #0a0f1e);
-  color: #E8EEF5;
-  font-family: "Inter", sans-serif;
+    background: linear-gradient(180deg, #020617, #020617);
+    font-family: Inter, system-ui, sans-serif;
 }
-h1 {
-  text-align: center;
-  background: linear-gradient(90deg, #00FFFF, #FF63E0);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: 800;
+
+.metric {
+    font-size: 34px;
+    font-weight: 800;
+    color: #38bdf8;
 }
-.metric-box {
-  text-align: center;
-  background: rgba(255,255,255,0.06);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(0,255,255,0.08);
-  backdrop-filter: blur(10px);
-  transition: transform .3s ease;
+.subtle {
+    color: #94a3b8;
+    font-size: 14px;
 }
-.metric-box:hover { transform: scale(1.03); }
-.metric-title { color: #9ed7f9; font-weight: 600; }
-.metric-value { font-size: 2rem; font-weight: 800; color: #00FFFF; }
-.progress-bar {
-  height: 12px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.15);
-  margin-top: 6px;
-}
-.progress-fill {
-  height: 12px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #00FFFF, #FF63E0);
+.action-card:hover {
+    border-color: #38bdf8;
+    transform: translateY(-2px);
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1>🎓 Student Progress Dashboard</h1>", unsafe_allow_html=True)
-st.caption("Track your resume growth, ATS performance, and grammar improvement over time 🚀")
+# ======================================================
+# 🧭 SIDEBAR NAVIGATION (POST-LOGIN ONLY)
+# ======================================================
+with st.sidebar:
+    st.markdown(f"👋 **{user_name}**")
+    st.caption("Resume workspace")
 
-# ===========================================
-# 📊 METRICS
-# ===========================================
-col1, col2, col3 = st.columns(3)
+ 
 
-col1.markdown(f"""
-<div class='metric-box'>
-  <div class='metric-title'>📄 Resumes Built</div>
-  <div class='metric-value'>{progress["resumes_built"]}</div>
-</div>
-""", unsafe_allow_html=True)
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.switch_page("app.py")
 
-col2.markdown(f"""
-<div class='metric-box'>
-  <div class='metric-title'>🧠 Avg ATS Score</div>
-  <div class='metric-value'>{progress["ats_score_avg"]}%</div>
-</div>
-""", unsafe_allow_html=True)
+# ======================================================
+# 🧠 HEADER
+# ======================================================
+st.markdown("## 📊 Dashboard")
+st.caption("Your resume performance at a glance")
 
-col3.markdown(f"""
-<div class='metric-box'>
-  <div class='metric-title'>✍️ Grammar Fixes</div>
-  <div class='metric-value'>{progress["grammar_fixes"]}</div>
-</div>
-""", unsafe_allow_html=True)
 
-# ===========================================
-# 📈 VISUAL PROGRESS
-# ===========================================
-def render_progress(label, percent):
-    filled = int(percent)
+
+
+
+# ======================================================
+# 📊 CORE METRICS
+# ======================================================
+c1, c2, c3 = st.columns(3)
+
+with c1:
     st.markdown(f"""
-    <div style='margin-top:10px;'>
-        <div style='font-weight:600;margin-bottom:4px;'>{label}</div>
-        <div class='progress-bar'>
-            <div class='progress-fill' style='width:{filled}%;'></div>
-        </div>
+    <div class="card">
+        <div class="metric">{profile["resumes_analyzed"]}</div>
+        <div class="subtle">Resumes analyzed</div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("### 📈 Progress Overview")
+with c2:
+    st.markdown(f"""
+    <div class="card">
+        <div class="metric">{profile["avg_ats_score"]}%</div>
+        <div class="subtle">Average ATS readiness</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-render_progress("Resume Building", min(progress["resumes_built"] * 20, 100))
-render_progress("ATS Optimization", progress["ats_score_avg"])
-render_progress("Grammar Mastery", min(progress["grammar_fixes"] * 10, 100))
+with c3:
+    st.markdown(f"""
+    <div class="card">
+        <div class="metric">{profile["grammar_fixes"]}</div>
+        <div class="subtle">Grammar improvements</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("---")
-st.markdown("### 🧭 Tools to Improve Your Profile")
+# ======================================================
+# 🧑‍💼 RECRUITER IMPRESSION (HUMAN FRIENDLY)
+# ======================================================
+st.markdown("### 🧑‍💼 Recruiter Impression")
 
-colA, colB, colC = st.columns(3)
-colA.page_link("pages/2_ATS_Score_Checker.py", label="📊 ATS Score Checker", icon="📄")
-colB.page_link("pages/3_Grammar_Enhancer.py", label="✍️ Grammar Enhancer", icon="🪄")
-colC.page_link("pages/4_Resume_Builder.py", label="🧠 Resume Builder", icon="📜")
+if profile["avg_ats_score"] >= 80:
+    st.success("Your resume is recruiter-ready. Strong technical signals detected.")
+elif profile["avg_ats_score"] >= 65:
+    st.info("Your resume is competitive. Minor refinements can improve outcomes.")
+else:
+    st.warning("Your experience is valuable, but impact clarity can be improved.")
 
-# ===========================================
-# ⚙️ LOGOUT
-# ===========================================
-st.sidebar.markdown(f"👋 Logged in as: **{st.session_state.user_name}**")
-if st.sidebar.button("🚪 Logout"):
-    st.session_state.logged_in = False
-    st.switch_page("app.py")
+# ======================================================
+# 🚀 NEXT BEST ACTION
+# ======================================================
+st.markdown("### 🚀 Recommended Next Step")
 
+if profile["resumes_analyzed"] == 0:
+    st.markdown("➡ Start with an ATS analysis to understand how your resume performs.")
+elif profile["avg_ats_score"] < 70:
+    st.markdown("➡ Improve one experience bullet by adding a measurable outcome.")
+else:
+    st.markdown("➡ Tailor your resume for a specific job description.")
+
+# ======================================================
+# 🧭 QUICK ACTIONS
+# ======================================================
+st.markdown("### 🧭 Tools")
+
+a1, a2, a3 = st.columns(3)
+
+with a1:
+    st.markdown('<div class="card action-card">', unsafe_allow_html=True)
+    st.markdown("📊 **ATS Score Checker**")
+    st.caption("Understand how ATS & recruiters read your resume")
+    if st.button("Open ATS Checker"):
+        st.switch_page("pages/2_ATS_Score_Checker.py")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with a2:
+    st.markdown('<div class="card action-card">', unsafe_allow_html=True)
+    st.markdown("✍️ **Grammar Enhancer**")
+    st.caption("Improve clarity, tone, and professionalism")
+    if st.button("Open Grammar Enhancer"):
+        st.switch_page("pages/3_Grammar_Enhancer.py")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with a3:
+   
+
+    st.markdown('<div class="card action-card">', unsafe_allow_html=True)
+    st.markdown("🧠 **Resume Builder**")
+    st.caption("Create recruiter-ready bullets")
+    if  st.button("⭐ Open Resume Builder", use_container_width=True):        st.switch_page("pages/4_Resume_Builder.py")
+    st.markdown('</div>', unsafe_allow_html=True)
