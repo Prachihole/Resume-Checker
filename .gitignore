@@ -1,1 +1,18 @@
 firebase_key.json
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local data files
+users.json
+user_progress.json
+
+# Uploaded profile images
+profile_*.png
+
+# Firebase / secrets
+firebase_key.json
