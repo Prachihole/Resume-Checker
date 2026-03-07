@@ -1,6 +1,13 @@
 import streamlit as st
 import json
 import os
+from firebase_config import db
+from datetime import datetime
+
+db.collection("test").add({
+    "message": "Firebase connected successfully",
+    "time": datetime.utcnow()
+})
 
 USER_PROGRESS_FILE = "user_progress.json"
 @st.cache_resource
