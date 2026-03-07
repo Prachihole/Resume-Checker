@@ -3,6 +3,12 @@ import json
 import os
 
 USER_PROGRESS_FILE = "user_progress.json"
+@st.cache_resource
+def load_model():
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer("all-MiniLM-L6-v2")
+
+model = load_model()
 
 def load_progress():
     if not os.path.exists(USER_PROGRESS_FILE):
