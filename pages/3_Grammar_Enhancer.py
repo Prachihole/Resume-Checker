@@ -1,9 +1,36 @@
-# ====================== IMPORTS ======================
+# =
+from firebase_config import db
+from datetime import datetime
+from datetime import datetime
+import json
+import os
 import streamlit as st
 import language_tool_python
 import html
 import re
+USER_PROGRESS_FILE = "user_progress.json"
 
+def load_progress():
+    if not os.path.exists(USER_PROGRESS_FILE):
+        with open(USER_PROGRESS_FILE, "w") as f:
+            json.dump({}, f)
+    with open(USER_PROGRESS_FILE, "r") as f:
+        return json.load(f)
+
+def save_progress(data):
+    with open(USER_PROGRESS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+def normalize_profile(profile):
+    defaults = {
+        "resumes_analyzed": 0,
+        "avg_ats_score": 0,
+        "grammar_fixes": 0,
+        "ats_history": []
+    }
+    for k, v in defaults.items():
+        profile.setdefault(k, v)
+    return profile
 # ====================== PAGE CONFIG (FIRST CALL) ======================
 st.set_page_config(
     page_title="Grammar Enhancer",
@@ -29,6 +56,7 @@ def load_tool():
     return language_tool_python.LanguageTool("en-US")
 
 tool = load_tool()
+
 
 # ====================== HELPERS ======================
 def detect_extra_issues(text):
@@ -134,7 +162,29 @@ if check:
         with st.spinner("Analyzing text..."):
             matches = tool.check(text)
             extra = detect_extra_issues(text)
+        grammar_errors = len(matches)
+data = {
+    "email": st.session_state.get("user_email", "unknown"),
+    "grammar_errors": grammar_errors,
+    "timestamp": datetime.utcnow()
+}
 
+db.collection("grammar_checks").add(data)
+
+# ================= DASHBOARD UPDATE =================
+user_email = st.session_state.user_email
+
+data = load_progress()
+
+if user_email not in data:
+        data[user_email] = normalize_profile({})
+
+        profile = normalize_profile(data[user_email])
+
+        profile["grammar_fixes"] += grammar_errors
+
+        data[user_email] = profile
+        save_progress(data)
         st.markdown("### 🔎 Highlighted Issues")
         st.markdown(
             build_highlighted_html(text, matches, extra),

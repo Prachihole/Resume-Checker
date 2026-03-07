@@ -3,6 +3,7 @@ import json
 import os
 
 
+
 USER_PROGRESS_FILE = "user_progress.json"
 @st.cache_resource
 def load_model():
@@ -211,8 +212,7 @@ from datetime import datetime
 missing_keywords = [k for k in jd_keywords if k not in resume_keywords]
 
 data = {
-    "email": st.session_state.get("email", "unknown"),
-    "ats_score": overall_ats,
+    "email": st.session_state.get("user_email", "unknown"),
     "missing_keywords": missing_keywords,
     "grammar_issues": 0,
     "timestamp": datetime.utcnow()
@@ -247,6 +247,7 @@ new_avg = round(
 
 profile["resumes_analyzed"] = new_count
 profile["avg_ats_score"] = new_avg
+
 
 data[user_email] = profile
 save_progress(data)
