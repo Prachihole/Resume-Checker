@@ -1,13 +1,7 @@
 import streamlit as st
 import json
 import os
-from firebase_config import db
-from datetime import datetime
 
-db.collection("test").add({
-    "message": "Firebase connected successfully",
-    "time": datetime.utcnow()
-})
 
 USER_PROGRESS_FILE = "user_progress.json"
 @st.cache_resource
@@ -211,6 +205,22 @@ overall_ats = round(
 if experience_score >= 12 and formatting_score == 15 and overall_ats < 65:
     overall_ats = 65
 
+from firebase_config import db
+from datetime import datetime
+
+missing_keywords = [k for k in jd_keywords if k not in resume_keywords]
+
+data = {
+    "email": st.session_state.get("email", "unknown"),
+    "ats_score": overall_ats,
+    "missing_keywords": missing_keywords,
+    "grammar_issues": 0,
+    "timestamp": datetime.utcnow()
+}
+
+db.collection("ats_results").add(data)
+
+
 # ======================================================
 # 📊 UPDATE DASHBOARD METRICS (SOURCE OF TRUTH)
 # ======================================================
@@ -382,6 +392,7 @@ else:
         greatly increase visibility.
         """
     )
+
 
 # ==========================================================
 # PROJECT-LEVEL INSIGHT
