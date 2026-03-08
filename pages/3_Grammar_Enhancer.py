@@ -170,10 +170,10 @@ if check:
 
         # ================= FIREBASE SAVE =================
         firebase_data = {
-            "email": st.session_state.get("user_email", "unknown"),
-            "grammar_errors": grammar_errors,
-            "timestamp": datetime.utcnow()
-        }
+          "email": st.session_state.user_email,
+          "grammar_errors": grammar_errors,
+          "timestamp": datetime.utcnow()
+}
 
         db.collection("grammar_checks").add(firebase_data)
 
