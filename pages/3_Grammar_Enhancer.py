@@ -154,23 +154,77 @@ if st.session_state.last_msg:
     st.session_state.last_msg = ""
 
 # ====================== ANALYSIS ======================
+
+# ====================== ANALYSIS ======================
 if check:
     text = st.session_state.input_text.strip()
+
     if not text:
         st.warning("Please paste some text first.")
     else:
         with st.spinner("Analyzing text..."):
             matches = tool.check(text)
             extra = detect_extra_issues(text)
+
         grammar_errors = len(matches)
-    data = {
-    "email": st.session_state.get("user_email", "unknown"),
-    "grammar_errors": grammar_errors,
-    "timestamp": datetime.utcnow()
-}
 
-    db.collection("grammar_checks").add(data)
+        # ================= FIREBASE SAVE =================
+        firebase_data = {
+            "email": st.session_state.get("user_email", "unknown"),
+            "grammar_errors": grammar_errors,
+            "timestamp": datetime.utcnow()
+        }
 
+        db.collection("grammar_checks").add(firebase_data)
+
+        # ================= LOCAL DASHBOARD UPDATE =================
+        user_email = st.session_state.user_email
+        progress_data = load_progress()
+
+        if user_email not in progress_data:
+            progress_data[user_email] = normalize_profile({})
+
+        profile = normalize_profile(progress_data[user_email])
+        profile["grammar_fixes"] += grammar_errors
+
+        progress_data[user_email] = profile
+        save_progress(progress_data)
+
+        # ================= HIGHLIGHT ERRORS =================
+        st.markdown("### 🔎 Highlighted Grammar Issues")
+
+        st.markdown(
+            build_highlighted_html(text, matches, extra),
+            unsafe_allow_html=True
+        )
+
+        # ================= SUMMARY =================
+        st.markdown("### 📊 Analysis Summary")
+
+        st.info(
+            f"Grammar mistakes detected: {len(matches)}  \n"
+            f"Spacing / punctuation issues: {len(extra)}  \n"
+            f"Total issues: {len(matches) + len(extra)}"
+        )
+
+        # ================= CORRECTED VERSION =================
+        corrected = tool.correct(text)
+
+        st.markdown("### ✅ Corrected Version")
+
+        st.text_area(
+            "Improved text",
+            corrected,
+            height=220,
+            disabled=True
+        )
+
+        st.download_button(
+            "⬇ Download Corrected Text",
+            data=corrected,
+            file_name="corrected_text.txt",
+            use_container_width=True
+        )
 # ================= DASHBOARD UPDATE =================
 user_email = st.session_state.user_email
 
