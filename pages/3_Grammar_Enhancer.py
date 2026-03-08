@@ -163,13 +163,13 @@ if check:
             matches = tool.check(text)
             extra = detect_extra_issues(text)
         grammar_errors = len(matches)
-data = {
+    data = {
     "email": st.session_state.get("user_email", "unknown"),
     "grammar_errors": grammar_errors,
     "timestamp": datetime.utcnow()
 }
 
-db.collection("grammar_checks").add(data)
+    db.collection("grammar_checks").add(data)
 
 # ================= DASHBOARD UPDATE =================
 user_email = st.session_state.user_email
