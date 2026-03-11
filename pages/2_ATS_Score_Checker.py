@@ -221,6 +221,57 @@ data = {
 db.collection("ats_results").add(data)
 
 
+
+import plotly.express as px
+import pandas as pd
+
+breakdown = {
+    "Factor": [
+        "Skill Match",
+        "Keyword Match",
+        "Experience Impact",
+        "Formatting"
+    ],
+    "Score": [
+        skill_score,
+        keyword_score,
+        experience_score,
+        formatting_score
+    ]
+}
+
+df = pd.DataFrame(breakdown)
+
+fig = px.bar(
+    df,
+    x="Score",
+    y="Factor",
+    orientation="h",
+    title="📊 ATS Score Breakdown"
+)
+
+fig.update_layout(template="plotly_dark")
+
+st.plotly_chart(fig, use_container_width=True)
+
+if missing_keywords:
+
+    import pandas as pd
+    import plotly.express as px
+
+    df = pd.DataFrame({
+        "Missing Skills": missing_keywords[:10],
+        "Importance": [1]*len(missing_keywords[:10])
+    })
+
+    fig = px.bar(
+        df,
+        x="Missing Skills",
+        y="Importance",
+        title="⚠️ Missing Keywords"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 # ======================================================
 # 📊 UPDATE DASHBOARD METRICS (SOURCE OF TRUTH)
 # ======================================================

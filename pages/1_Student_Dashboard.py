@@ -188,43 +188,7 @@ with col3:
 st.subheader("📊 Resume Analytics")
 st.caption("Track how your resume improves with each analysis")
 # ======================================================
-import plotly.express as px
-import pandas as pd
 
-docs = db.collection("ats_results").where(
-    "email","==",user_email
-).stream()
-
-history = []
-
-for doc in docs:
-    d = doc.to_dict()
-
-    history.append({
-        "score": d.get("ats_score", 0),
-        "time": d.get("timestamp")
-    })
-
-if history:
-
-    df = pd.DataFrame(history)
-
-    df["time"] = pd.to_datetime(df["time"])
-
-    fig = px.line(
-        df,
-        x="time",
-        y="score",
-        markers=True,
-        title="📈 ATS Score Improvement"
-    )
-
-    fig.update_layout(
-        yaxis=dict(range=[0,100]),
-        template="plotly_dark"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
 
 
 import plotly.graph_objects as go
