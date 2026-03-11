@@ -184,6 +184,9 @@ with col3:
     </div>
     """, unsafe_allow_html=True)
 
+
+st.subheader("📊 Resume Analytics")
+st.caption("Track how your resume improves with each analysis")
 # ======================================================
 import plotly.express as px
 import pandas as pd
@@ -198,20 +201,27 @@ for doc in docs:
     d = doc.to_dict()
 
     history.append({
-        "score": d.get("ats_score",0),
-        "time": str(d.get("timestamp"))
+        "score": d.get("ats_score", 0),
+        "time": d.get("timestamp")
     })
 
 if history:
 
     df = pd.DataFrame(history)
 
+    df["time"] = pd.to_datetime(df["time"])
+
     fig = px.line(
         df,
         x="time",
         y="score",
         markers=True,
-        title="📈 ATS Score Progress"
+        title="📈 ATS Score Improvement"
+    )
+
+    fig.update_layout(
+        yaxis=dict(range=[0,100]),
+        template="plotly_dark"
     )
 
     st.plotly_chart(fig, use_container_width=True)
