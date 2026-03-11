@@ -87,25 +87,44 @@ save_progress(data)
 # ======================================================
 
 st.markdown("""
-
 <style>
-.metric {
-    font-size: 34px;
-    font-weight: 800;
-    color: #38bdf8;
-}
-.subtle {
-    color: #94a3b8;
-    font-size: 14px;
-}
-.card {
-    padding:20px;
-    border-radius:10px;
-    background:#020617;
-}
-</style>
 
+.main-title{
+font-size:42px;
+font-weight:800;
+background: linear-gradient(90deg,#38bdf8,#6366f1);
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+}
+
+.subtitle{
+color:#94a3b8;
+font-size:16px;
+}
+
+.metric-card{
+background:#0f172a;
+padding:25px;
+border-radius:14px;
+border:1px solid #1e293b;
+text-align:center;
+}
+
+.metric-value{
+font-size:36px;
+font-weight:800;
+color:#38bdf8;
+}
+
+.metric-label{
+color:#94a3b8;
+}
+
+</style>
 """, unsafe_allow_html=True)
+
+st.markdown('<div class="main-title">📊 Resume Analytics Dashboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Track ATS performance, grammar improvements and resume insights</div>', unsafe_allow_html=True)
 
 # ======================================================
 
@@ -139,22 +158,78 @@ st.info(
 # CORE METRICS
 
 # ======================================================
+col1, col2, col3 = st.columns(3)
 
-c1, c2, c3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-value">{profile["resumes_analyzed"]}</div>
+        <div class="metric-label">Resumes Analyzed</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with c1:
- st.markdown(f""" <div class="card"> <div class="metric">{profile["resumes_analyzed"]}</div> <div class="subtle">Resumes analyzed</div> </div>
-""", unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-value">{profile["avg_ats_score"]}%</div>
+        <div class="metric-label">Average ATS Score</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with c2:
- st.markdown(f""" <div class="card"> <div class="metric">{profile["avg_ats_score"]}%</div> <div class="subtle">Average ATS readiness</div> </div>
-""", unsafe_allow_html=True)
-
-with c3:
- st.markdown(f""" <div class="card"> <div class="metric">{profile["grammar_fixes"]}</div> <div class="subtle">Grammar improvements</div> </div>
-""", unsafe_allow_html=True)
+with col3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-value">{profile["grammar_fixes"]}</div>
+        <div class="metric-label">Grammar Improvements</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ======================================================
+import plotly.express as px
+import pandas as pd
+
+docs = db.collection("ats_results").where(
+    "email","==",user_email
+).stream()
+
+history = []
+
+for doc in docs:
+    d = doc.to_dict()
+
+    history.append({
+        "score": d.get("ats_score",0),
+        "time": str(d.get("timestamp"))
+    })
+
+if history:
+
+    df = pd.DataFrame(history)
+
+    fig = px.line(
+        df,
+        x="time",
+        y="score",
+        markers=True,
+        title="📈 ATS Score Progress"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+import plotly.graph_objects as go
+
+fig = go.Figure(go.Indicator(
+    mode = "gauge+number",
+    value = profile["avg_ats_score"],
+    title = {'text': "Resume Strength"},
+    gauge = {
+        'axis': {'range': [0,100]},
+        'bar': {'color': "#38bdf8"}
+    }
+))
+
+st.plotly_chart(fig,use_container_width=True)
 
 # RECRUITER IMPRESSION
 
@@ -192,23 +267,82 @@ else:
 
 st.markdown("### 🧭 Tools")
 
-a1, a2, a3 = st.columns(3)
+st.markdown("""
+<style>
+.tool-card {
+    background: #0f172a;
+    padding: 28px;
+    border-radius: 14px;
+    border: 1px solid #1e293b;
+    text-align: center;
+    transition: 0.25s;
+}
 
-with a1:
- st.markdown("### 📊 ATS Score Checker")
-st.caption("Understand how ATS & recruiters read your resume")
-if st.button("Open ATS Checker", key="ats_btn"):
- st.switch_page("pages/2_ATS_Score_Checker.py")
+.tool-card:hover {
+    transform: translateY(-6px);
+    border: 1px solid #38bdf8;
+    box-shadow: 0 6px 20px rgba(56,189,248,0.15);
+}
 
-with a2:
- st.markdown("### ✍️ Grammar Enhancer")
-st.caption("Improve clarity, tone, and professionalism")
-if st.button("Open Grammar Enhancer", key="grammar_btn"):
-  st.switch_page("pages/3_Grammar_Enhancer.py")
+.tool-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
 
-with a3:
-  st.markdown("### 🧠 Resume Builder")
-  st.caption("Create recruiter-ready bullets")
-if st.button("⭐ Open Resume Builder", key="builder_btn"):
-  st.switch_page("pages/4_Resume_Builder.py")
+.tool-desc {
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
 
+col1, col2, col3 = st.columns(3)
+
+# ATS TOOL
+with col1:
+    st.markdown("""
+    <div class="tool-card">
+        <div class="tool-title">📊 ATS Score Checker</div>
+        <div class="tool-desc">
+        Analyze how ATS systems evaluate your resume
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("Launch Tool", key="ats_tool"):
+        st.switch_page("pages/2_ATS_Score_Checker.py")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# GRAMMAR TOOL
+with col2:
+    st.markdown("""
+    <div class="tool-card">
+        <div class="tool-title">✍️ Grammar Enhancer</div>
+        <div class="tool-desc">
+        Improve clarity, grammar, and professionalism
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("Launch Tool", key="grammar_tool"):
+        st.switch_page("pages/3_Grammar_Enhancer.py")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# RESUME BUILDER
+with col3:
+    st.markdown("""
+    <div class="tool-card">
+        <div class="tool-title">🧠 Resume Builder</div>
+        <div class="tool-desc">
+        Generate recruiter-ready experience bullets
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("Launch Tool", key="resume_tool"):
+        st.switch_page("pages/4_Resume_Builder.py")
+
+    st.markdown("</div>", unsafe_allow_html=True)
