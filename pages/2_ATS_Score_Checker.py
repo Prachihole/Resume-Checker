@@ -182,7 +182,7 @@ bullets = extract_experience_bullets(lines)
 
 jd_keywords = extract_keywords(jd_text)
 resume_keywords = extract_keywords(resume_text)
-
+missing_keywords = [k for k in jd_keywords if k not in resume_keywords]
 semantic_match = semantic_similarity(resume_text, jd_text)
 matched_keywords = [k for k in jd_keywords if k in resume_keywords]
 
@@ -206,22 +206,18 @@ overall_ats = round(
 if experience_score >= 12 and formatting_score == 15 and overall_ats < 65:
     overall_ats = 65
 
-from firebase_config import db
 from datetime import datetime
+from firebase_config import db
 
-missing_keywords = [k for k in jd_keywords if k not in resume_keywords]
-
-data = {
-    "email": st.session_state.get("user_email", "unknown"),
+firebase_data = {
+    "email": st.session_state.user_email,
+    "ats_score": overall_ats,
     "missing_keywords": missing_keywords,
-    "grammar_issues": 0,
+    "job_description": jd_text[:150],  # store short version
     "timestamp": datetime.utcnow()
 }
 
-db.collection("ats_results").add(data)
-
-
-
+db.collection("ats_results").add(firebase_data)
 import plotly.express as px
 import pandas as pd
 
