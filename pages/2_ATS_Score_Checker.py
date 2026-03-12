@@ -209,11 +209,21 @@ if experience_score >= 12 and formatting_score == 15 and overall_ats < 65:
 from datetime import datetime
 from firebase_config import db
 
+job_desc = jd_text.strip()
+
+if job_desc == "":
+    job_desc = "Not provided"
+
+missing_keywords_to_store = missing_keywords[:5]
+
+if not missing_keywords_to_store:
+    missing_keywords_to_store = ["None"]
+
 firebase_data = {
     "email": st.session_state.user_email,
     "ats_score": overall_ats,
-    "missing_keywords": missing_keywords,
-    "job_description": jd_text[:150],  # store short version
+    "missing_keywords": missing_keywords_to_store,
+    "job_description": job_desc[:150],
     "timestamp": datetime.utcnow()
 }
 
