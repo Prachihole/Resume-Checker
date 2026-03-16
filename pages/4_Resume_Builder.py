@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image
 import language_tool_python
 import os
-st.set_page_config(layout="wide")
+
 ROLE_KEYWORDS = {
     "AI / ML Engineer": [
         "python","machine learning","deep learning","computer vision",
@@ -42,8 +42,7 @@ if not st.session_state.get("logged_in", False):
 # ====================== CACHED GRAMMAR TOOL ======================
 @st.cache_resource
 def load_tool():
-    return language_tool_python.LanguageTool("en-US")
-
+    return language_tool_python.LanguageToolPublicAPI("en-US")
 grammar_tool = load_tool()
 
 # ====================== HEADER ======================
@@ -77,13 +76,19 @@ with st.container(border=True):
     with col2:
         st.markdown("📸 **Profile Photo (optional)**")
         photo = st.file_uploader("Upload JPG / PNG", type=["jpg","jpeg","png"])
+
+        if photo and photo.size > 2 * 1024 * 1024:
+           st.error("Image too large. Upload under 2MB.")
+           st.stop()
         img_path = None
         if photo:
             image = Image.open(photo)
             image.thumbnail((150,150))
             st.image(image)
             img_path = f"profile_{email}.png"
-            image.save(img_path)
+            img_bytes = BytesIO()
+            image.save(img_bytes, format="PNG")
+            img_bytes.seek(0)
 
 # ====================== SECTION TOGGLES ======================
 st.markdown("## 🧩 Resume Sections")
@@ -300,8 +305,11 @@ if st.button("🚀 Generate Resume & Analyze", use_container_width=True):
 
         ats_score, found_keys = ats_analysis(combined_text, job_role)
 
-        grammar_issues = grammar_tool.check(combined_text)[:8]
-
+        @st.cache_data
+        def check_grammar(text):
+            return grammar_tool.check(text)
+        grammar_issues = check_grammar(combined_text)[:8]
+        raw_issues = check_grammar(combined_text)
         st.success(f"✅ Resume Generated — ATS Score: {ats_score}%")
 
         st.markdown("## 🧠 Resume Intelligence")
@@ -327,7 +335,6 @@ if st.button("🚀 Generate Resume & Analyze", use_container_width=True):
 
 
 
-        raw_issues = grammar_tool.check(combined_text)
         grammar_hints = clean_grammar_messages(raw_issues)
 
         st.markdown("## ✍️ Grammar Hints")
