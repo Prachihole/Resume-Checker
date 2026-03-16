@@ -54,7 +54,7 @@ if "last_msg" not in st.session_state:
 # ====================== INIT LANGUAGE TOOL ======================
 @st.cache_resource
 def load_tool():
-    return language_tool_python.LanguageTool("en-US")
+    return language_tool_python.LanguageToolPublicAPI("en-US")
 
 tool = load_tool()
 
