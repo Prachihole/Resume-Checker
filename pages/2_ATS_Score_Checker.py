@@ -2,7 +2,11 @@ import streamlit as st
 import json
 import os
 
-st.set_page_config(layout="wide")
+st.set_page_config(
+    page_title="ATS Resume Checker",
+    page_icon="📊",
+    layout="wide"
+)
 
 USER_PROGRESS_FILE = "user_progress.json"
 @st.cache_resource
@@ -39,7 +43,7 @@ if not st.session_state.get("logged_in", False):
     st.warning("Please log in to access this page.")
     st.stop()
 
-import streamlit as st
+
 import docx2txt
 import re
 from sentence_transformers import SentenceTransformer
@@ -48,11 +52,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ==========================================================
 # PAGE CONFIG
 # ==========================================================
-st.set_page_config(
-    page_title="ATS Resume Checker",
-    page_icon="📊",
-    layout="wide"
-)
 
 st.markdown("## 📊 ATS Resume Checker")
 st.caption(
@@ -63,11 +62,7 @@ st.caption(
 # ==========================================================
 # LOAD MODEL
 # ==========================================================
-@st.cache_resource
-def load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
 
-model = load_model()
 
 # ==========================================================
 # CONSTANTS
@@ -163,7 +158,9 @@ resume_file = st.file_uploader(
     "📤 Upload Resume (DOCX / TXT)",
     type=["docx","txt"]
 )
-
+if resume_file and resume_file.size > 2*1024*1024:
+    st.error("File too large. Please upload under 2MB.")
+    st.stop()
 jd_text = st.text_area(
     "🧾 Paste Job Description (optional but recommended)",
     height=120
@@ -226,8 +223,8 @@ firebase_data = {
     "job_description": job_desc[:150],
     "timestamp": datetime.utcnow()
 }
-
-db.collection("ats_results").add(firebase_data)
+if st.button("Save ATS Result"):
+    db.collection("ats_results").add(firebase_data)
 import plotly.express as px
 import pandas as pd
 
@@ -359,7 +356,8 @@ data[user_email] = profile
 save_progress(data)
 
 
-
+with st.spinner("Analyzing resume..."):
+    semantic_match = semantic_similarity(resume_text, jd_text)
 
 
 # ==========================================================
