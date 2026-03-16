@@ -74,7 +74,7 @@ docs = db.collection("grammar_checks").where(
 total_fixes = 0
 for d in docs:
  doc_data = d.to_dict()
-total_fixes += doc_data.get("grammar_errors", 0)
+ total_fixes += doc_data.get("grammar_errors", 0)
 
 profile["grammar_fixes"] = total_fixes
 data[user_email] = profile
