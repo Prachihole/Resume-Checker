@@ -8,6 +8,7 @@ import streamlit as st
 import language_tool_python
 import html
 import re
+st.set_page_config(layout="wide")
 USER_PROGRESS_FILE = "user_progress.json"
 
 def load_progress():

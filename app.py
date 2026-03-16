@@ -1,7 +1,7 @@
 import streamlit as st
 
 from backend.auth import login_user, register_user
-
+st.set_page_config(layout="wide")
 # ======================================================
 # PAGE CONFIG — CENTERED, NO SIDEBAR
 # ======================================================

@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import os
 
-
+st.set_page_config(layout="wide")
 
 USER_PROGRESS_FILE = "user_progress.json"
 @st.cache_resource

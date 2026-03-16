@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import os
 from firebase_config import db
-
+st.set_page_config(layout="wide")
 # ======================================================
 
 # PAGE CONFIG

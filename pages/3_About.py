@@ -1,5 +1,5 @@
 import streamlit as st
-
+st.set_page_config(layout="wide")
 if not st.session_state.get("logged_in", False):
     st.warning("Please log in to access this page.")
     st.stop()

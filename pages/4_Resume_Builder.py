@@ -8,6 +8,7 @@ from io import BytesIO
 from PIL import Image
 import language_tool_python
 import os
+st.set_page_config(layout="wide")
 ROLE_KEYWORDS = {
     "AI / ML Engineer": [
         "python","machine learning","deep learning","computer vision",
@@ -51,7 +52,7 @@ st.markdown("""
 background: linear-gradient(90deg,#00FFFF,#FF63E0);
 -webkit-background-clip:text;
 -webkit-text-fill-color:transparent;'>
-🧠 Smart Resume Builder 4.0
+🧠 Smart Resume Builder 
 </h1>
 """, unsafe_allow_html=True)
 
