@@ -8,6 +8,7 @@ Pillow>=9.5.0
 
 # NLP & grammar
 language-tool-python>=2.8.0
+sentence-transformers>=2.2.2
 
 # Data handling
 numpy>=1.23.0
@@ -19,4 +20,3 @@ plotly>=5.15.0
 # Firebase
 firebase-admin>=6.5.0
 pyrebase4>=4.7.1
-
