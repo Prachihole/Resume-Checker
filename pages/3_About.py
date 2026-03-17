@@ -1,12 +1,14 @@
 import streamlit as st
-st.set_page_config(layout="wide")
+
+st.set_page_config(
+    page_title="About",
+    page_icon="ℹ️",
+    layout="wide"
+)
+
 if not st.session_state.get("logged_in", False):
     st.warning("Please log in to access this page.")
     st.stop()
-
-import streamlit as st
-
-st.set_page_config(page_title="About", page_icon="ℹ️")
 
 st.title("ℹ️ About AI Resume ATS")
 st.markdown("""
@@ -28,3 +30,4 @@ AI/ML & Software Engineer
 
 > “Your resume is your first impression. Let’s make it intelligent.” 🌟
 """)
+

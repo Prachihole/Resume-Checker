@@ -29,7 +29,7 @@ ROLE_KEYWORDS = {
 
 # ====================== PAGE CONFIG (FIRST CALL) ======================
 st.set_page_config(
-    page_title=" Smart Resume Builder",
+    page_title="Smart Resume Builder",
     page_icon="🧠",
     layout="wide"
 )
@@ -42,9 +42,19 @@ if not st.session_state.get("logged_in", False):
 # ====================== CACHED GRAMMAR TOOL ======================
 @st.cache_resource
 def load_tool():
-    return language_tool_python.LanguageToolPublicAPI("en-US")
+    try:
+        return language_tool_python.LanguageToolPublicAPI("en-US")
+    except Exception:
+        return None
 grammar_tool = load_tool()
-
+@st.cache_data
+def check_grammar(text):
+    try:
+        if grammar_tool:
+            return grammar_tool.check(text)
+        return []
+    except Exception:
+        return []
 # ====================== HEADER ======================
 st.markdown("""
 <h1 style='text-align:center;
@@ -76,16 +86,17 @@ with st.container(border=True):
     with col2:
         st.markdown("📸 **Profile Photo (optional)**")
         photo = st.file_uploader("Upload JPG / PNG", type=["jpg","jpeg","png"])
-
+        img_bytes = None
         if photo and photo.size > 2 * 1024 * 1024:
            st.error("Image too large. Upload under 2MB.")
            st.stop()
         img_path = None
+        img_bytes = None
         if photo:
             image = Image.open(photo)
             image.thumbnail((150,150))
             st.image(image)
-            img_path = f"profile_{email}.png"
+            
             img_bytes = BytesIO()
             image.save(img_bytes, format="PNG")
             img_bytes.seek(0)
@@ -229,10 +240,10 @@ def create_resume():
     contact_run.font.size = Pt(10)
 
 # RIGHT SIDE: Photo (top-right)
-    if img_path and os.path.exists(img_path):
-       pr = right_cell.paragraphs[0]
-       pr.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-       pr.add_run().add_picture(img_path, width=Inches(1.0))
+    if img_bytes:
+      pr = right_cell.paragraphs[0]
+      pr.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+      pr.add_run().add_picture(img_bytes, width=Inches(1.0))
 
 
     add_section(doc, "Professional Summary", summary)
@@ -255,7 +266,6 @@ def create_resume():
     buf.seek(0)
     return buf
 
-# ====================== ATS + GRAMMAR ======================
 def ats_analysis(text, role):
     base_score = 50
     keywords = ROLE_KEYWORDS.get(role, [])
@@ -300,16 +310,21 @@ if st.button("🚀 Generate Resume & Analyze", use_container_width=True):
     if not name or not email or not phone:
         st.warning("Please fill all basic details.")
     else:
-        combined_text = " ".join(sections_text.values())
+        combined_text = " ".join([v.strip() for v in sections_text.values() if v and v.strip()])
         total_words = len(combined_text.split())
 
         ats_score, found_keys = ats_analysis(combined_text, job_role)
 
-        @st.cache_data
-        def check_grammar(text):
-            return grammar_tool.check(text)
-        grammar_issues = check_grammar(combined_text)[:8]
+        
         raw_issues = check_grammar(combined_text)
+        grammar_issues = raw_issues[:8]
+
+        if len(combined_text) > 5000:
+          st.warning("Resume too long for analysis. Please shorten.")
+          st.stop()
+
+        if not grammar_tool:
+           st.warning("Grammar service temporarily unavailable.")
         st.success(f"✅ Resume Generated — ATS Score: {ats_score}%")
 
         st.markdown("## 🧠 Resume Intelligence")

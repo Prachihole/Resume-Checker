@@ -1,14 +1,14 @@
 # =
 from firebase_config import db
 from datetime import datetime
-from datetime import datetime
+
 import json
 import os
 import streamlit as st
 import language_tool_python
 import html
 import re
-st.set_page_config(layout="wide")
+
 USER_PROGRESS_FILE = "user_progress.json"
 
 def load_progress():
@@ -54,7 +54,10 @@ if "last_msg" not in st.session_state:
 # ====================== INIT LANGUAGE TOOL ======================
 @st.cache_resource
 def load_tool():
-    return language_tool_python.LanguageToolPublicAPI("en-US")
+    try:
+        return language_tool_python.LanguageToolPublicAPI("en-US")
+    except Exception:
+        return None
 
 tool = load_tool()
 
@@ -125,8 +128,11 @@ def build_highlighted_html(text, matches, extra):
 
 # ====================== CALLBACKS ======================
 def apply_all():
-    st.session_state.input_text = tool.correct(st.session_state.input_text)
-    st.session_state.last_msg = "✅ All suggestions applied"
+    if tool:
+        st.session_state.input_text = tool.correct(st.session_state.input_text)
+        st.session_state.last_msg = "✅ All suggestions applied"
+    else:
+        st.session_state.last_msg = "⚠️ Grammar service unavailable"
 
 def clear_text():
     st.session_state.input_text = ""
@@ -159,12 +165,22 @@ if st.session_state.last_msg:
 # ====================== ANALYSIS ======================
 if check:
     text = st.session_state.input_text.strip()
-
+    if len(text) > 5000:
+         st.warning("Text too long. Please shorten it.")
+         st.stop()
     if not text:
         st.warning("Please paste some text first.")
     else:
         with st.spinner("Analyzing text..."):
-            matches = tool.check(text)
+            try:
+               if tool:
+                 matches = tool.check(text)
+               else:
+                  matches = []
+                  st.warning("Grammar service unavailable. Try later.")
+            except Exception:
+                  matches = []
+                  st.warning("Grammar service temporarily unavailable.")
             extra = detect_extra_issues(text)
 
         grammar_errors = len(matches)
@@ -209,7 +225,7 @@ if check:
         )
 
         # ================= CORRECTED VERSION =================
-        corrected = tool.correct(text)
+        corrected = tool.correct(text) if tool else text
 
         st.markdown("### ✅ Corrected Version")
 
@@ -227,45 +243,3 @@ if check:
             use_container_width=True
         )
 # ================= DASHBOARD UPDATE =================
-user_email = st.session_state.user_email
-
-data = load_progress()
-
-if user_email not in data:
-        data[user_email] = normalize_profile({})
-
-        profile = normalize_profile(data[user_email])
-
-        profile["grammar_fixes"] += grammar_errors
-
-        data[user_email] = profile
-        save_progress(data)
-        st.markdown("### 🔎 Highlighted Issues")
-        st.markdown(
-            build_highlighted_html(text, matches, extra),
-            unsafe_allow_html=True
-        )
-
-        st.markdown("### 📊 Summary")
-        st.info(
-            f"Grammar issues: {len(matches)} | "
-            f"Spacing & punctuation issues: {len(extra)} | "
-            f"Total: {len(matches) + len(extra)}"
-        )
-
-        corrected = tool.correct(text)
-
-        st.markdown("### ✅ Corrected Preview")
-        st.text_area(
-            "Final corrected text",
-            corrected,
-            height=220,
-            disabled=True
-        )
-
-        st.download_button(
-            "⬇️ Download Corrected Text",
-            data=corrected,
-            file_name="corrected_text.txt",
-            use_container_width=True
-        ) 
