@@ -177,7 +177,7 @@ if check:
                  matches = tool.check(text)
                else:
                   matches = []
-                  st.warning("Grammar service unavailable. Try later.")
+                  st.warning("⚠️ Grammar service is temporarily busy. Please try again in a few seconds.")
             except Exception:
                   matches = []
                   st.warning("Grammar service temporarily unavailable.")
