@@ -58,7 +58,7 @@ ATS-Resume-Checker/
 
 🚀 Getting Started
 🔧 Installation
-git clone https://github.com/your-username/ATS-Resume-Checker.git
+git clone https://github.com/Prachihole/Resume-Checker.git
 cd ATS-Resume-Checker
 pip install -r requirements.txt
 
