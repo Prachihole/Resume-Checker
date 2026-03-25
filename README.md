@@ -34,11 +34,16 @@ Timestamp
 
 ⚙️ Tech Stack
 Layer	Technology
-Frontend	Streamlit
-Backend	Python
-Database	Firebase Firestore
-Auth	Firebase Authentication
-AI Logic	NLP-based text matching
+
+Frontend-	Streamlit
+
+Backend	-Python
+
+Database-	Firebase Firestore
+
+Auth-	Firebase Authentication
+
+AI Logic-	NLP-based text matching
 
 🧠 How It Works
 📂 Project Structure
@@ -71,14 +76,19 @@ Add credentials in:
 firebase_config.py
 
 ▶️ Run the App
+
 streamlit run app.py
 
 📈 Future Scope
 
 🚀 AI Resume Suggestions
+
 📄 Downloadable Report (PDF)
+
 🎯 Role-Based Scoring System
+
 🌐 Live Deployment (Streamlit Cloud)
+
 📊 Admin Dashboard (Analytics)
 
 💡 Why This Project?
